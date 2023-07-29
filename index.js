@@ -56,6 +56,7 @@ app.post("/weather", (req, res) => {
 
   const query = "INSERT INTO Readings SET ?";
   db.query(query, weatherData, (err, result) => {
+    
     if (err) {
       console.error("Error inserting data into the database:", err);
       return res
@@ -66,7 +67,6 @@ app.post("/weather", (req, res) => {
     console.log("Data inserted successfully.");
     return res.status(200).json({
       message: "Data inserted successfully.",
-      datetime: new Date(datetime),
     });
   });
 
@@ -75,7 +75,6 @@ app.post("/weather", (req, res) => {
     if (err) {
       console.log(err)
     }
-    console.log(weatherData.datetime)
   })
 });
 
