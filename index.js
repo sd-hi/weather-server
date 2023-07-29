@@ -12,6 +12,7 @@ const port = process.env.EXPRESS_PORT;
 // MySQL configuration to ensure incoming timestamps treated as UTC
 const config = {
   timezone: "UTC",
+  apiKey: process.env.API_KEY,
 };
 const pool = mysql.createPool(config);
 pool.on("connection", (conn) => {
@@ -36,6 +37,18 @@ db.connect((err) => {
   console.log("Connected to MySQL database!");
 });
 
+// Apply authentication middleware to all routes
+const apiAuthMiddleware = (req, res, next) => {
+  const apiKey = req.headers["x-api-key"];
+  console.log(config.apiKey)
+  console.log(apiKey);
+  if (!apiKey || apiKey !== config.apiKey) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+};
+app.use(apiAuthMiddleware);
+
 // Middleware to parse JSON data in the request body
 app.use(bodyParser.json());
 
@@ -56,7 +69,6 @@ app.post("/weather", (req, res) => {
 
   const query = "INSERT INTO Readings SET ?";
   db.query(query, weatherData, (err, result) => {
-    
     if (err) {
       console.error("Error inserting data into the database:", err);
       return res
@@ -73,9 +85,9 @@ app.post("/weather", (req, res) => {
   const query2 = "SELECT * FROM Readings ORDER BY datetime DESC LIMIT 1";
   db.query(query2, weatherData, (err, result) => {
     if (err) {
-      console.log(err)
+      console.log(err);
     }
-  })
+  });
 });
 
 // Start the server
