@@ -40,8 +40,6 @@ db.connect((err) => {
 // Apply authentication middleware to all routes
 const apiAuthMiddleware = (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
-  console.log(config.apiKey)
-  console.log(apiKey);
   if (!apiKey || apiKey !== config.apiKey) {
     return res.status(401).json({ error: "Unauthorized" });
   }
