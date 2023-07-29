@@ -1,5 +1,6 @@
 # Use an official Node.js runtime as the base image
-FROM node:14
+# Accurate as of July 2023
+FROM node:18
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
