@@ -1,7 +1,8 @@
-const express = require("express");
-const mysql = require("mysql");
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
+const express = require("express");
+const mysql = require("mysql");
+const Joi = require("joi");
 
 // Get environment variables
 dotenv.config();
@@ -52,18 +53,31 @@ app.use(bodyParser.json());
 
 // Route to receive weather data and store it in the database
 app.post("/weather", (req, res) => {
-  const { datetime, temperature, humidity } = req.body;
+  const { deviceId, dateTime, humidity, locationId, temperature } = req.body;
 
-  if (!datetime || !temperature || !humidity) {
-    return res.status(400).json({ error: "Missing required data fields." });
+  // Validate payload format
+  const schema = Joi.object({
+    deviceId: Joi.string().required(),
+    dateTime: Joi.string()
+      .isoDate({ options: { format: "date-time" } })
+      .required(),
+    locationId: Joi.string().required(),
+    temperature: Joi.number().required(),
+    humidity: Joi.number(),
+  });
+  const { error } = schema.validate(req.body);
+  if (error) {
+    // Validation failure
+    return res.status(400).json({ error: error.details[0].message });
   }
 
   const weatherData = {
-    datetime: new Date(datetime),
-    temperature: parseFloat(temperature),
+    deviceid: deviceId,
+    datetime: new Date(dateTime),
+    locationid: locationId,
     humidity: parseFloat(humidity),
+    temperature: parseFloat(temperature),
   };
-  console.log(weatherData.datetime);
 
   const query = "INSERT INTO Readings SET ?";
   db.query(query, weatherData, (err, result) => {
@@ -78,13 +92,6 @@ app.post("/weather", (req, res) => {
     return res.status(200).json({
       message: "Data inserted successfully.",
     });
-  });
-
-  const query2 = "SELECT * FROM Readings ORDER BY datetime DESC LIMIT 1";
-  db.query(query2, weatherData, (err, result) => {
-    if (err) {
-      console.log(err);
-    }
   });
 });
 
