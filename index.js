@@ -1,62 +1,46 @@
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const express = require("express");
+const knex = require("knex");
 const mysql = require("mysql");
 const Joi = require("joi");
 
 // Get environment variables
 dotenv.config();
 
+// Establish database connection to MySQL DB with knex as ORM
+const db = knex({
+  client: "mysql",
+  connection: {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+  },
+});
+
 const app = express();
 const port = process.env.EXPRESS_PORT;
 
-// MySQL configuration to ensure incoming timestamps treated as UTC
-const config = {
-  timezone: "UTC",
-  apiKey: process.env.API_KEY,
-};
-const pool = mysql.createPool(config);
-pool.on("connection", (conn) => {
-  conn.query("SET time_zone='+00:00;", (error) => {
-    if (error) {
-      throw error;
-    }
-  });
-});
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-});
-
-// Connect to the database
-db.connect((err) => {
-  if (err) {
-    throw err;
-  }
-  console.log("Connected to MySQL database!");
-});
+// Middleware to parse JSON data in the request body
+app.use(bodyParser.json());
 
 // Apply authentication middleware to all routes
 const apiAuthMiddleware = (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
-  if (!apiKey || apiKey !== config.apiKey) {
+  if (!apiKey || apiKey !== process.env.API_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
 };
 app.use(apiAuthMiddleware);
 
-// Middleware to parse JSON data in the request body
-app.use(bodyParser.json());
-
 // Route to receive weather data and store it in the database
-app.post("/weather", (req, res) => {
+app.post("/weather", async (req, res) => {
   const { deviceId, dateTime, humidity, locationId, temperature } = req.body;
 
-  // Validate payload format
-  const schema = Joi.object({
+  // Prepare validation schema for input payload
+  const measurementSchema = Joi.object({
     deviceId: Joi.string().required(),
     dateTime: Joi.string()
       .isoDate({ options: { format: "date-time" } })
@@ -65,34 +49,45 @@ app.post("/weather", (req, res) => {
     temperature: Joi.number().required(),
     humidity: Joi.number(),
   });
-  const { error } = schema.validate(req.body);
+  const measurementsSchema = Joi.object({
+    measurements: Joi.array().items(measurementSchema),
+  });
+
+  // Validate the payload
+  const { error } = measurementsSchema.validate(req.body);
   if (error) {
-    // Validation failure
     return res.status(400).json({ error: error.details[0].message });
   }
 
-  const weatherData = {
-    deviceid: deviceId,
-    datetime: new Date(dateTime),
-    locationid: locationId,
-    humidity: parseFloat(humidity),
-    temperature: parseFloat(temperature),
-  };
-
-  const query = "INSERT INTO Readings SET ?";
-  db.query(query, weatherData, (err, result) => {
-    if (err) {
-      console.error("Error inserting data into the database:", err);
-      return res
-        .status(500)
-        .json({ error: "Error inserting data into the database." });
-    }
-
-    console.log("Data inserted successfully.");
-    return res.status(200).json({
-      message: "Data inserted successfully.",
-    });
+  measurements = req.body.measurements.map((measurement) => {
+    return {
+      deviceid: measurement.deviceId,
+      datetime: new Date(measurement.dateTime),
+      locationid: measurement.locationId,
+      humidity: parseFloat(measurement.humidity),
+      temperature: parseFloat(measurement.temperature),
+    };
   });
+
+  try {
+    // Perform database update in a transaction (overwrite on duplicate)
+    await db.transaction(async (trx) => {
+      await trx
+        .insert(measurements)
+        .into("temperatures")
+        .onConflict("datetime")
+        .merge();
+    });
+
+    return res.status(200).json({
+      message: `${measurements.length} measurement${
+        measurements.length > 1 ? "s" : ""
+      } added successfully`,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to add measurements" });
+  }
 });
 
 // Start the server
