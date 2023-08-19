@@ -41,29 +41,29 @@ app.post("/weather", async (req, res) => {
 
   // Prepare validation schema for input payload
   const measurementSchema = Joi.object({
-    deviceId: Joi.string().required(),
     dateTime: Joi.string()
       .isoDate({ options: { format: "date-time" } })
       .required(),
-    locationId: Joi.string().required(),
     temperature: Joi.number().required(),
     humidity: Joi.number(),
   });
-  const measurementsSchema = Joi.object({
+  const payloadSchema = Joi.object({
+    deviceId: Joi.string().required(),
+    locationId: Joi.string().required(),
     measurements: Joi.array().items(measurementSchema),
   });
 
   // Validate the payload
-  const { error } = measurementsSchema.validate(req.body);
+  const { error } = payloadSchema.validate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
   }
 
   measurements = req.body.measurements.map((measurement) => {
     return {
-      deviceid: measurement.deviceId,
+      deviceid: req.body.deviceId,
       datetime: new Date(measurement.dateTime),
-      locationid: measurement.locationId,
+      locationid: req.body.locationId,
       humidity: parseFloat(measurement.humidity),
       temperature: parseFloat(measurement.temperature),
     };
