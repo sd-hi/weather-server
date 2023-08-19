@@ -70,6 +70,25 @@ app.post("/temperatures", async (req, res) => {
   });
 
   try {
+    // Create the temperatures table if it does not already exist
+    await db.schema.hasTable("temperatures").then((exists) => {
+      if (!exists) {
+        console.log(
+          `Creating temperatures table in database ${process.env.DB_NAME}...`
+        );
+        return db.schema.createTable("temperatures", (table) => {
+          table.timestamp("datetime").notNullable();
+          table.string("locationid", 45).notNullable();
+
+          table.string("deviceid", 45).notNullable().defaultTo("");
+          table.float("humidity").notNullable();
+          table.float("temperature").notNullable();
+
+          table.primary(["datetime", "deviceid"]);
+        });
+      }
+    });
+
     // Perform database update in a transaction (overwrite on duplicate)
     await db.transaction(async (trx) => {
       await trx
