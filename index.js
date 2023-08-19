@@ -20,7 +20,7 @@ const db = knex({
 });
 
 const app = express();
-const port = process.env.EXPRESS_PORT;
+const port = 3000;
 
 // Middleware to parse JSON data in the request body
 app.use(bodyParser.json());
@@ -35,8 +35,8 @@ const apiAuthMiddleware = (req, res, next) => {
 };
 app.use(apiAuthMiddleware);
 
-// Route to receive weather data and store it in the database
-app.post("/weather", async (req, res) => {
+// Route to receive temperature data and store it in the database
+app.post("/temperatures", async (req, res) => {
   const { deviceId, dateTime, humidity, locationId, temperature } = req.body;
 
   // Prepare validation schema for input payload
