@@ -2,7 +2,6 @@ const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const express = require("express");
 const knex = require("knex");
-const mysql = require("mysql");
 const Joi = require("joi");
 
 // Get environment variables
@@ -10,7 +9,7 @@ dotenv.config();
 
 // Establish database connection to MySQL DB with knex as ORM
 const db = knex({
-  client: "mysql",
+  client: "mysql2",
   connection: {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
