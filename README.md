@@ -101,7 +101,7 @@ curl --location '1.2.3.4:5000/temperatures' \
 A successful response should be returned
 ```json
 {
-    "message": "2 measurements added successfully"
+  "message": "2 measurements added successfully"
 }
 ```
 # Appendix
