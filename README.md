@@ -234,11 +234,12 @@ In the query pane on the bottom-left:
 - Choose "Code" mode ("Builder/Code" switch on top-right)
 - Enter the following query
 ```sql
-Select
-datetime as time,
-temperature as "My Office"
+SELECT
+datetime AS time,
+temperature AS "My Office"
 FROM temperatures
-WHERE locationid = "location1"
+WHERE $__timeFilter(datetime)
+AND locationid = "location1"
 ```
 The above query will show all data points with a `locationid` of `location1` in the database, the dataset will be labeled "My Office"
 
