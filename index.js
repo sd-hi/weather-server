@@ -22,7 +22,7 @@ const app = express();
 const port = 3000;
 
 // Middleware to parse JSON data in the request body
-app.use(bodyParser.json());
+app.use(bodyParser.json({limit: '50mb'}));
 
 // Apply authentication middleware to all routes
 const apiAuthMiddleware = (req, res, next) => {
