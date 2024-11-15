@@ -1,0 +1,40 @@
+meta {
+  name: temperatures
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://{{url}}:{{port}}/temperatures
+  body: json
+  auth: none
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+body:json {
+  {
+    "deviceId": "test_device",
+    "locationId": "test_location",
+    "measurements": [
+      {
+        "dateTime": "{{timestamp}}",
+        "temperature": 70.12,
+        "humidity": 20.34
+      }
+    ]
+  }
+}
+
+vars:pre-request {
+  timestamp: 
+}
+
+script:pre-request {
+  const moment = require("moment");
+  
+  bru.setVar("timestamp", moment().format());
+  console.log(bru.getVar("timestamp"));
+}
