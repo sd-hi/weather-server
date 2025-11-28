@@ -7,9 +7,9 @@ const Joi = require("joi");
 // Get environment variables
 dotenv.config();
 
-// Establish database connection to MySQL DB with knex as ORM
+// Establish database connection to PostgreSQL DB with knex as ORM
 const db = knex({
-  client: "mysql2",
+  client: "pg",
   connection: {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
