@@ -7,9 +7,9 @@ const Joi = require("joi");
 // Get environment variables
 dotenv.config();
 
-// Establish database connection to MySQL DB with knex as ORM
+// Establish database connection to PostgreSQL DB with knex as ORM
 const db = knex({
-  client: "mysql2",
+  client: "pg",
   connection: {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -58,7 +58,8 @@ app.post("/temperatures", async (req, res) => {
     return res.status(400).json({ error: error.details[0].message });
   }
 
-  measurements = req.body.measurements.map((measurement) => {
+  // Map measurements to entries to be written
+  const measurements = req.body.measurements.map((measurement) => {
     return {
       deviceid: req.body.deviceId,
       datetime: new Date(measurement.dateTime),
@@ -70,37 +71,36 @@ app.post("/temperatures", async (req, res) => {
 
   try {
     // Create the temperatures table if it does not already exist
-    await db.schema.hasTable("temperatures").then((exists) => {
-      if (!exists) {
-        console.log(
-          `Creating temperatures table in database ${process.env.DB_NAME}...`
-        );
-        return db.schema.createTable("temperatures", (table) => {
-          table.timestamp("datetime").notNullable();
-          table.string("locationid", 45).notNullable();
+    const exists = await db.schema.hasTable("temperatures");
+    if (!exists) {
+      console.log(
+        `Creating temperatures table in database ${process.env.DB_NAME}...`
+      );
+      await db.schema.createTable("temperatures", (table) => {
+        // Use timestamp with timezone for Postgres
+        table.timestamp("datetime", { useTz: false }).notNullable();
+        table.string("locationid", 45).notNullable();
 
-          table.string("deviceid", 45).notNullable().defaultTo("");
-          table.float("humidity").notNullable();
-          table.float("temperature").notNullable();
+        table.string("deviceid", 45).notNullable().defaultTo("");
+        table.float("humidity").notNullable();
+        table.float("temperature").notNullable();
 
-          table.primary(["datetime", "deviceid"]);
-        });
-      }
-    });
+        table.primary(["datetime", "deviceid"]);
+      });
+    }
 
-    // Perform database update in a transaction (overwrite on duplicate)
+    // Perform database update in a transaction (overwrite on duplicate composite PK)
     await db.transaction(async (trx) => {
-      await trx
+      await trx("temperatures")
         .insert(measurements)
-        .into("temperatures")
-        .onConflict("datetime")
+        .onConflict(["datetime", "deviceid"])
         .merge();
     });
 
     return res.status(200).json({
       message: `${measurements.length} measurement${
         measurements.length > 1 ? "s" : ""
-      } added successfully`,
+        } added successfully`,
     });
   } catch (error) {
     console.error(error);
