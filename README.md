@@ -1,5 +1,5 @@
 # weather-server
-The `weather-server` application is a simple HTTP server that can receive temperature readings from multiple devices, and stores them in a MySQL database.
+The `weather-server` application is a simple HTTP server that can receive temperature readings from multiple devices, and stores them in a PostgreSQL database.
 
 This allows you to use reporting tools (such as Grafana) to create a dashboard to illustrate a history of temperatures at multiple locations.
 
@@ -9,7 +9,7 @@ This allows you to use reporting tools (such as Grafana) to create a dashboard t
 ## Prerequisites
 Setting up this server requires the following:
 - Server or VPS running Linux (this documentation assumes Ubuntu 22.04)
-- A MySQL database with the following:
+- A PostgreSQL database with the following:
 	- Empty database named `weather`
 	- User granted privileges on database `weather`
 - Docker
@@ -17,7 +17,7 @@ Setting up this server requires the following:
 Step by step instructions on setting up these prerequisites can be found in the Appendix section further down.
 
 ### System requirements
-If you intend on running this application on the same machine as a MySQL database and a Grafana instance, these minimum specifications are recommended:
+If you intend on running this application on the same machine as a PostgreSQL database and a Grafana instance, these minimum specifications are recommended:
 - 2 GB RAM
 - 10 GB disk
 
@@ -40,9 +40,9 @@ Set the variables based on guidance below
 
 ### Environment variables
 Set the following environment variables:
-- `DB_HOST` - Set this to the IP address of your MySQL database
-- `DB_USER` - MySQL database username (e.g. `weatheruser`)
-- `DB_PASS` - MySQL user's password
+- `DB_HOST` - Set this to the IP address of your PostgreSQL database
+- `DB_USER` - PostgreSQL database username (e.g. `weatheruser`)
+- `DB_PASS` - PostgreSQL user's password
 - `DB_NAME` - The database name in which the measurement will be stored (e.g. `weather`)
 - `API_KEY` - The API key clients will use as the 'password' (passed on requests as a HTTP header `x-api-key`)
 
@@ -116,33 +116,28 @@ sudo docker run hello-world
 ```
 Which should download a `hello-world` test container and print a confirmation message.
 
-## Installing MySQL
-### Create a MySQL container
-If you already have a MySQL server deployed, this sub-section can be skipped.
+## Installing PostgreSQL
+### Create a PostgreSQL container
+If you already have a PostgreSQL server deployed, this sub-section can be skipped.
 
 Pull image from repository
 ```bash
-sudo docker pull mysql:latest
+sudo docker pull postgres
 ```
 Run the container
 ```bash
-sudo docker run --name mysql -e MYSQL_ROOT_PASSWORD="rootpassword123" -p 3306:3306 -d mysql:latest
+sudo docker run --name postgres -e POSTGRES_PASSWORD="rootpassword123" -p 5432:5432 -d postgres
 ```
-This creates a docker container named `mysql` containing the MySQL database with a root user `root` whose password is `rootpassword123` (pick something better!), it can be connected to on port 3306.
+This creates a Docker container named `postgres` containing the PostgreSQL database with a default user `postgres` whose password is `rootpassword123` (choose a stronger password!). The database can be accessed on port 5432.
 
-### Log into MySQL
-Connect to the created docker container named `mysql`
+### Log into PostgreSQL
+Connect to the `sql` prompt of created docker container named `postgres`, as user `postgres`:
 ```bash
-sudo docker exec -it mysql bash
+docker exec -it postgres psql -U postgres
 ```
-Now log into SQL with 
-```
-mysql -u root -p
-```
-Enter root password when prompted
 
 ### Create a database
-Log into the MySQL console, create a database for the weather server application to write its data to.
+Log into the PostgreSQL console, create a database for the weather server application to write its data to.
 
 Example below creates a database called `weather` (this is to be consistent with the environment variable `DB_NAME` for the `weather-server`)
 ```sql
@@ -150,20 +145,21 @@ CREATE DATABASE weather;
 ```
 Create a database user `weatheruser` with password `password123` for the weather server to use
 ```sql
-CREATE USER 'weatheruser'@'%' IDENTIFIED BY 'password123';
+CREATE USER weatheruser WITH PASSWORD 'password123';
 ```
 Grant the user access to everything on the `weather` database
 ```sql
-GRANT ALL PRIVILEGES ON weather.* TO 'weatheruser'@'%';
-```
-Update the privileges with command
-```sql
-FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON DATABASE weather TO weatheruser;
+\c weather
+GRANT USAGE ON SCHEMA public TO weatheruser;
+GRANT CREATE ON SCHEMA public TO weatheruser;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO weatheruser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO weatheruser;
 ```
 
 ## Using Grafana
 ### Grafana installation
-Grafana is a powerful dashboard allowing you to easily view the time series data from the MySQL database
+Grafana is a powerful dashboard allowing you to easily view the time series data from the PostgreSQL database
 *For more information see https://grafana.com/docs/grafana/latest/setup-grafana/installation/docker/#use-persistent-storage-recommended*
 Create a persistent volume for Grafana
 ```bash
@@ -179,28 +175,25 @@ sudo docker run -d -p 3000:3000 --name=grafana \
   --volume grafana-storage:/var/lib/grafana \
   grafana/grafana-enterprise
 ```
-### MySQL DB user
-Create a DB user `grafana` with access to the MySQL database.
-Log into MySQL database
+### PostgreSQL DB user
+Create a DB user `grafana` with access to the PostgreSQL database.
+Log into PostgreSQL database SQL prompt
 ```bash
-sudo docker exec -it mysql bash
-```
-Log into SQL prompt
-```
-mysql -u root -p
+docker exec -it postgres psql -U postgres
 ```
 Create a grafana user
 ```sql
-CREATE USER 'grafana'@'%' IDENTIFIED BY 'password123';
+CREATE USER grafana WITH PASSWORD 'password123';
 ```
 Grant the user appropriate permissions on the weather database
 ```sql
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER ON weather.* TO 'grafana'@'%';
+GRANT CONNECT ON DATABASE weather TO grafana;
+\c weather
+GRANT USAGE ON SCHEMA public TO grafana;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO grafana;
 ```
-Update the privileges with command
-```sql
-FLUSH PRIVILEGES;
-```
+
 ### Grafana setup
 #### Logging in to Grafana
 Assuming the Grafana Docker container has been set up on port 3000, navigate to the VPS in web browser (where `1.2.3.4` is address of server)
@@ -209,25 +202,25 @@ Assuming the Grafana Docker container has been set up on port 3000, navigate to 
 ```
 A Grafana login page should be presented
 The default username and password is `admin:admin`
-#### Setup MySQL as data source
+#### Setup PostgreSQL as data source
 - Click the menu symbol **≡**
 - Choose "Data sources"
 - On data sources pane, press "Add data source"
-- Select `MySQL`
-- Enter the MySQL database credentials for the user created earlier
-	- Enter the host as `1.2.3.4:3306` (consistent with VPS IP and MySQL DB port)
+- Select `PostgreSQL`
+- Enter the PostgreSQL database credentials for the user created earlier
+	- Enter the host as `1.2.3.4:5432` (consistent with VPS IP and PostgreSQL DB port)
 	- Database is `weather`
 	- User is `grafana` (password consistent with creation)
 - Click "Save & test" at the bottom
 You should see a message "Database Connection OK"
 #### Build Grafana dashboard
-*Tip: Insert some rows into the `temperatures` table in the MySQL `weather` database to prove the data points can be seen in the following dashboard. The easiest way to do this is to post some sample payloads to the weather server, see the "Test function" section above*
+*Tip: Insert some rows into the `temperatures` table in the PostgreSQL `weather` database to prove the data points can be seen in the following dashboard. The easiest way to do this is to post some sample payloads to the weather server, see the "Test function" section above*
 - Click the menu symbol **≡**
 - Choose "Dashboards"
 - Press "New" button
 - Choose "New dashboard" from dropdown menu
 - Choose "Add visualization"
-- Choose MySQL database as the data source
+- Choose PostgreSQL database as the data source
 ##### Query pane
 In the query pane on the bottom-left:
 - Press "+ Query" to add a query
