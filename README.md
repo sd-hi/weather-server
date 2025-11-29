@@ -147,10 +147,16 @@ Create a database user `weatheruser` with password `password123` for the weather
 ```sql
 CREATE USER weatheruser WITH PASSWORD 'password123';
 ```
-Grant the user access to everything on the `weather` database
+Grant the user access to everything on the `weather` database:
 ```sql
 GRANT ALL PRIVILEGES ON DATABASE weather TO weatheruser;
+```
+Switch to the `weather` database:
+```
 \c weather
+```
+Grant the `weatheruser` user access to the public schema:
+```sql
 GRANT USAGE ON SCHEMA public TO weatheruser;
 GRANT CREATE ON SCHEMA public TO weatheruser;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO weatheruser;
@@ -185,10 +191,16 @@ Create a grafana user
 ```sql
 CREATE USER grafana WITH PASSWORD 'password123';
 ```
-Grant the user appropriate permissions on the weather database
+Grant the user appropriate permissions on the weather database:
 ```sql
 GRANT CONNECT ON DATABASE weather TO grafana;
+```
+Switch to `weather` database:
+```
 \c weather
+```
+Grant the user select access to the `public` schema:
+```sql
 GRANT USAGE ON SCHEMA public TO grafana;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO grafana;
